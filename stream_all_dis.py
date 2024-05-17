@@ -1,8 +1,9 @@
 import numpy as np
 import streamlit as st
-import pandas as pd
 import joblib
-import os
+import subprocess
+
+subprocess.run(["pip", "install", "streamlit==1.31.1", "scikit-learn==1.3.2"])
 
 # Load trained models
 diabetes_classifier = joblib.load('stacked_model_diabetes.pkl')
@@ -60,6 +61,18 @@ def predict_anemia(gender, *args):
     preprocessed_data = preprocess_input_anemia(gender, *args)
     preprocessed_data = np.array(preprocessed_data).reshape(1, -1)
     return stacking_classifier_anemia.predict(preprocessed_data)
+
+def decode_anemia_prediction(prediction):
+    if prediction == 0:
+        return "No Anemia"
+    if prediction == 1:
+        return "HGB Anemia"
+    if prediction == 2:
+        return "Iron Anemia"
+    if prediction == 3:
+        return "Folate Anemia"
+    if prediction == 4:
+        return "B12 Anemia"
 
 
 # Streamlit app
@@ -150,7 +163,8 @@ def main():
             ferrite = st.number_input('Ferrite', min_value=0)
         if st.button('Predict Anemia Disease'):
             result = predict_anemia(gender, hemoglobin, tsd, folate, b12, ferrite)
-            st.write(result)
+            prediction = decode_anemia_prediction(result[0])
+            st.write(prediction)
 
 
 if __name__ == "__main__":
