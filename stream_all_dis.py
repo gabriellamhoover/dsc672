@@ -1,13 +1,14 @@
+import numpy as np
 import streamlit as st
 import pandas as pd
 import joblib
 import os
 
-
 # Load trained models
 diabetes_classifier = joblib.load('stacked_model_diabetes.pkl')
 stacking_classifier_heart = joblib.load('stacked_model_heart.pkl')
 stacking_classifier_lung = joblib.load('stacking_classifier_model.pkl')
+stacking_classifier_anemia = joblib.load('anemia_stacked_model.pkl')
 
 
 # Preprocessing and prediction functions for Diabetes
@@ -44,10 +45,28 @@ def predict_lung_cancer(age, *args):
     return stacking_classifier_lung.predict([preprocessed_data])
 
 
+# predict for anemia
+
+def preprocess_input_anemia(gender, *args):
+    gender_encoded = 1 if gender == 'M' else 0
+    preprocessed_data = []
+    for x in args:
+        preprocessed_data.append(x)
+    preprocessed_data.insert(4, gender_encoded)
+    return preprocessed_data
+
+
+def predict_anemia(gender, *args):
+    preprocessed_data = preprocess_input_anemia(gender, *args)
+    preprocessed_data = np.array(preprocessed_data).reshape(1, -1)
+    return stacking_classifier_anemia.predict(preprocessed_data)
+
+
 # Streamlit app
 def main():
     st.title('Medical Prediction Systems')
-    tab1, tab2, tab3 = st.tabs(["Diabetes Prediction", "Heart Disease Prediction", "Lung Cancer Prediction"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Diabetes Prediction", "Heart Disease Prediction", "Lung Cancer Prediction", "Anemia Prediction"])
 
     with tab1:
         st.header("Diabetes Prediction")
@@ -114,6 +133,24 @@ def main():
                                          allergy, wheezing, alcohol_consuming, coughing, shortness_of_breath,
                                          swallowing_difficulty)
             st.write('Lung Cancer' if result[0] == 1 else 'No Lung Cancer')
+
+    with tab4:
+        st.header("Anemia Prediction")
+        # features gender, hemoglobin, total serum iron, folate, B12, ferrite
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            hemoglobin = st.number_input('Hemoglobin', min_value=0.00)
+            # 1 is male
+            gender = st.selectbox('Gender', ['M', 'F'])
+        with col2:
+            tsd = st.number_input('Total Serum Iron', min_value=0)
+            folate = st.number_input('Folate', min_value=0)
+        with col3:
+            b12 = st.number_input('B12', min_value=0)
+            ferrite = st.number_input('Ferrite', min_value=0)
+        if st.button('Predict Anemia Disease'):
+            result = predict_anemia(gender, hemoglobin, tsd, folate, b12, ferrite)
+            st.write(result)
 
 
 if __name__ == "__main__":
