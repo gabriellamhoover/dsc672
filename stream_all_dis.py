@@ -6,9 +6,9 @@ import subprocess
 subprocess.run(["pip", "install", "streamlit==1.31.1", "scikit-learn==1.3.2"])
 
 # Load trained models
-diabetes_classifier = joblib.load('stacked_model_diabetes.pkl')
-stacking_classifier_heart = joblib.load('stacked_model_heart.pkl')
-stacking_classifier_lung = joblib.load('stacking_classifier_model.pkl')
+diabetes_classifier = joblib.load('stacked_diabetes_model.pkl')
+stacking_classifier_heart = joblib.load('stacked_heart_model.pkl')
+stacking_classifier_lung = joblib.load('stacking_cancer_model.pkl')
 stacking_classifier_anemia = joblib.load('anemia_stacked_model.pkl')
 
 
