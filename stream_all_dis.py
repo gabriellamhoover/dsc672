@@ -2,6 +2,10 @@ import numpy as np
 import streamlit as st
 import joblib
 import subprocess
+import lime
+import pandas as pd
+from lime.lime_tabular import LimeTabularExplainer
+from matplotlib import pyplot as plt
 
 subprocess.run(["pip", "install", "streamlit==1.31.1", "scikit-learn==1.3.2"])
 
@@ -10,6 +14,20 @@ diabetes_classifier = joblib.load('stacked_diabetes_model.pkl')
 stacking_classifier_heart = joblib.load('stacked_heart_model.pkl')
 stacking_classifier_lung = joblib.load('stacking_cancer_model.pkl')
 stacking_classifier_anemia = joblib.load('anemia_stacked_model.pkl')
+
+X_train_anemia = pd.read_pickle('X_train_anemia.pkl')
+y_train_anemia = pd.read_pickle('y_train_anemia.pkl')
+class_names = ["No Anemia", "HGB Anemia", "Iron Anemia", "Folate Anemia", "B12 Anemia"]
+anemia_explainer = LimeTabularExplainer(
+    training_data=X_train_anemia.values,
+    training_labels=y_train_anemia.values,
+    feature_names=X_train_anemia.columns,
+    class_names=class_names,
+    mode='classification',
+    random_state=42
+)
+
+anemia_feature_names = ['HGB', 'TSD', 'FOLATE', 'B12', 'GENDER', 'FERRITE']
 
 
 # Preprocessing and prediction functions for Diabetes
@@ -60,7 +78,9 @@ def preprocess_input_anemia(gender, *args):
 def predict_anemia(gender, *args):
     preprocessed_data = preprocess_input_anemia(gender, *args)
     preprocessed_data = np.array(preprocessed_data).reshape(1, -1)
-    return stacking_classifier_anemia.predict(preprocessed_data)
+    explanation = anemia_explanation(preprocessed_data)
+    return stacking_classifier_anemia.predict(preprocessed_data), explanation
+
 
 def decode_anemia_prediction(prediction):
     if prediction == 0:
@@ -73,6 +93,13 @@ def decode_anemia_prediction(prediction):
         return "Folate Anemia"
     if prediction == 4:
         return "B12 Anemia"
+
+
+def anemia_explanation(instance):
+    series = pd.Series(instance[0], index=anemia_feature_names)
+    exp = anemia_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_anemia.predict_proba,
+                                            num_features=6)
+    return exp
 
 
 # Streamlit app
@@ -162,9 +189,15 @@ def main():
             b12 = st.number_input('B12', min_value=0)
             ferrite = st.number_input('Ferrite', min_value=0)
         if st.button('Predict Anemia Disease'):
-            result = predict_anemia(gender, hemoglobin, tsd, folate, b12, ferrite)
+            result, explanation = predict_anemia(gender, hemoglobin, tsd, folate, b12, ferrite)
             prediction = decode_anemia_prediction(result[0])
+
             st.write(prediction)
+
+            st.pyplot(explanation.as_pyplot_figure())
+            plt.clf()
+
+            explanation.show_in_notebook()
 
 
 if __name__ == "__main__":
