@@ -15,19 +15,68 @@ stacking_classifier_heart = joblib.load('stacked_heart_model.pkl')
 stacking_classifier_lung = joblib.load('stacking_cancer_model.pkl')
 stacking_classifier_anemia = joblib.load('anemia_stacked_model.pkl')
 
+# make anemia explainer
 X_train_anemia = pd.read_pickle('X_train_anemia.pkl')
 y_train_anemia = pd.read_pickle('y_train_anemia.pkl')
-class_names = ["No Anemia", "HGB Anemia", "Iron Anemia", "Folate Anemia", "B12 Anemia"]
+anemia_class_names = ["No Anemia", "HGB Anemia", "Iron Anemia", "Folate Anemia", "B12 Anemia"]
 anemia_explainer = LimeTabularExplainer(
     training_data=X_train_anemia.values,
     training_labels=y_train_anemia.values,
     feature_names=X_train_anemia.columns,
-    class_names=class_names,
+    class_names=anemia_class_names,
     mode='classification',
     random_state=42
 )
 
 anemia_feature_names = ['HGB', 'TSD', 'FOLATE', 'B12', 'GENDER', 'FERRITE']
+
+# make diabetes explainer
+X_train_diabetes = pd.read_pickle('X_train_diabetes.pkl')
+y_train_diabetes = pd.read_pickle('y_train_diabetes.pkl')
+diabetes_class_names = ['0', '1']
+diabetes_explainer = LimeTabularExplainer(
+    training_data=X_train_diabetes.values,
+    training_labels=y_train_diabetes.values,
+    feature_names=X_train_diabetes.columns,
+    class_names=diabetes_class_names,
+    mode='classification',
+    random_state=42
+)
+
+diabetes_feature_names = ['BMI', 'Pregnancies', 'SkinThickness', 'Insulin', 'DiabetesPedigreeFunction', 'Glucose',
+                          'Age', 'BloodPressure']
+
+X_train_lung = pd.read_pickle('X_train_lung.pkl')
+y_train_lung = pd.read_pickle('y_train_lung.pkl')
+lung_class_names = ['0', '1']
+lung_explainer = LimeTabularExplainer(
+    training_data=X_train_lung.values,
+    training_labels=y_train_lung.values,
+    feature_names=X_train_lung.columns,
+    class_names=lung_class_names,
+    mode='classification',
+    random_state=42
+)
+
+lung_feature_names = ['ALLERGY ', 'PEER_PRESSURE', 'ALCOHOL CONSUMING', 'AGE', 'SMOKING',
+                      'CHRONIC DISEASE', 'SWALLOWING DIFFICULTY', 'WHEEZING', 'FATIGUE ',
+                      'YELLOW_FINGERS', 'ANXIETY', 'SHORTNESS OF BREATH', 'COUGHING']
+
+X_train_heart = pd.read_pickle('X_train_heart.pkl')
+y_train_heart = pd.read_pickle('y_train_heart.pkl')
+heart_class_names = ['0', '1']
+heart_explainer = LimeTabularExplainer(
+    training_data=X_train_heart.values,
+    training_labels=y_train_heart.values,
+    feature_names=X_train_heart.columns,
+    class_names=heart_class_names,
+    mode='classification',
+    random_state=42
+)
+
+heart_feature_names = ['ST slope', 'max heart rate', 'cholesterol', 'age', 'resting bps',
+                       'oldpeak', 'chest pain type', 'resting ecg', 'sex', 'exercise angina',
+                       'fasting blood sugar']
 
 
 # Preprocessing and prediction functions for Diabetes
@@ -37,7 +86,15 @@ def preprocess_input_diabetes(*args):
 
 def predict_diabetes(*args):
     preprocessed_data = preprocess_input_diabetes(*args)
-    return diabetes_classifier.predict([preprocessed_data])
+    explanation = diabetes_explanation(preprocessed_data)
+
+    return diabetes_classifier.predict([preprocessed_data]), explanation
+
+
+def diabetes_explanation(instance):
+    series = pd.Series(instance, index=diabetes_feature_names)
+    exp = diabetes_explainer.explain_instance(data_row=series, predict_fn=diabetes_classifier.predict_proba)
+    return exp
 
 
 # Preprocessing and prediction functions for Heart Disease
@@ -48,7 +105,15 @@ def preprocess_input_heart(age, sex, *rest):
 
 def predict_heart_disease(age, sex, *rest):
     preprocessed_data = preprocess_input_heart(age, sex, *rest)
-    return stacking_classifier_heart.predict([preprocessed_data])
+    explanation = heart_explanation(preprocessed_data)
+    return stacking_classifier_heart.predict([preprocessed_data]), explanation
+
+
+def heart_explanation(instance):
+    series = pd.Series(instance, index=heart_feature_names)
+    exp = heart_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_heart.predict_proba)
+    return exp
+
 
 
 # Preprocessing and prediction functions for Lung Cancer
@@ -61,7 +126,15 @@ def preprocess_input_lung(age, *args):
 
 def predict_lung_cancer(age, *args):
     preprocessed_data = preprocess_input_lung(age, *args)
-    return stacking_classifier_lung.predict([preprocessed_data])
+    #have to rerun code to make classifier with svc(probability=True)
+    explanation = lung_explanation(preprocessed_data)
+    return stacking_classifier_lung.predict([preprocessed_data]), explanation
+
+
+def lung_explanation(instance):
+    series = pd.Series(instance, index=lung_feature_names)
+    exp = lung_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_lung.predict_proba)
+    return exp
 
 
 # predict for anemia
@@ -123,9 +196,14 @@ def main():
             DiabetesPedigreeFunction = st.number_input('Diabetes Pedigree Function', min_value=0.0)
             Age = st.number_input('Age', min_value=0, step=1)
         if st.button('Predict Diabetes'):
-            result = predict_diabetes(Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI,
-                                      DiabetesPedigreeFunction, Age)
+            result, explanation = predict_diabetes(Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI,
+                                                   DiabetesPedigreeFunction, Age)
             st.write('Diabetic' if result[0] == 1 else 'Not Diabetic')
+
+            st.pyplot(explanation.as_pyplot_figure())
+            plt.clf()
+
+            explanation.show_in_notebook()
 
     with tab2:
         st.header("Heart Disease Prediction")
@@ -145,10 +223,14 @@ def main():
             oldpeak = st.number_input('Oldpeak', min_value=0.0)
             ST_slope = st.number_input('ST Slope', min_value=0, max_value=3)
         if st.button('Predict Heart Disease'):
-            result = predict_heart_disease(age, sex, chest_pain_type, resting_bps, cholesterol, fasting_blood_sugar,
+            result, explanation = predict_heart_disease(age, sex, chest_pain_type, resting_bps, cholesterol, fasting_blood_sugar,
                                            resting_ecg, max_heart_rate, exercise_angina, oldpeak, ST_slope)
             st.write('Heart Disease' if result[0] == 1 else 'No Heart Disease')
 
+            st.pyplot(explanation.as_pyplot_figure())
+            plt.clf()
+
+            explanation.show_in_notebook()
     with tab3:
         st.header("Lung Cancer Prediction")
         col1, col2, col3 = st.columns(3)
@@ -173,6 +255,11 @@ def main():
                                          allergy, wheezing, alcohol_consuming, coughing, shortness_of_breath,
                                          swallowing_difficulty)
             st.write('Lung Cancer' if result[0] == 1 else 'No Lung Cancer')
+
+            st.pyplot(explanation.as_pyplot_figure())
+            plt.clf()
+
+            explanation.show_in_notebook()
 
     with tab4:
         st.header("Anemia Prediction")
