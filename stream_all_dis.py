@@ -256,7 +256,7 @@ def main():
             st.pyplot(explanation.as_pyplot_figure(result[0]))
             plt.clf()
     with tab4:
-        st.header("Anemia Prediction")
+        st.header("Should I see a hematologist?")
         # features gender, hemoglobin, total serum iron, folate, B12, ferrite
         col1, col2, col3 = st.columns(3)
         with col1:
