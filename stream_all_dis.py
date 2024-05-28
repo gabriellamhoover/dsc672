@@ -1,11 +1,10 @@
 import numpy as np
 import streamlit as st
 import joblib
-import subprocess
-import lime
 import pandas as pd
 from lime.lime_tabular import LimeTabularExplainer
 from matplotlib import pyplot as plt
+import streamlit.components.v1 as components
 
 # Load trained models
 diabetes_classifier = joblib.load('stacked_diabetes_model.pkl')
@@ -31,7 +30,7 @@ anemia_feature_names = ['HGB', 'TSD', 'FOLATE', 'B12', 'GENDER', 'FERRITE']
 # make diabetes explainer
 X_train_diabetes = pd.read_pickle('X_train_diabetes.pkl')
 y_train_diabetes = pd.read_pickle('y_train_diabetes.pkl')
-diabetes_class_names = ['0', '1']
+diabetes_class_names = ['No Diabetes', 'Diabetes']
 diabetes_explainer = LimeTabularExplainer(
     training_data=X_train_diabetes.values,
     training_labels=y_train_diabetes.values,
@@ -46,7 +45,7 @@ diabetes_feature_names = ['BMI', 'Pregnancies', 'SkinThickness', 'Insulin', 'Dia
 
 X_train_lung = pd.read_pickle('X_train_lung.pkl')
 y_train_lung = pd.read_pickle('y_train_lung.pkl')
-lung_class_names = ['0', '1']
+lung_class_names = ['No Lung cancer', 'Lung Cancer']
 lung_explainer = LimeTabularExplainer(
     training_data=X_train_lung.values,
     training_labels=y_train_lung.values,
@@ -62,7 +61,7 @@ lung_feature_names = ['ALLERGY ', 'PEER_PRESSURE', 'ALCOHOL CONSUMING', 'AGE', '
 
 X_train_heart = pd.read_pickle('X_train_heart.pkl')
 y_train_heart = pd.read_pickle('y_train_heart.pkl')
-heart_class_names = ['0', '1']
+heart_class_names = ['No Heart Disease', 'Heart Disease']
 heart_explainer = LimeTabularExplainer(
     training_data=X_train_heart.values,
     training_labels=y_train_heart.values,
@@ -77,19 +76,20 @@ heart_feature_names = ['ST slope', 'max heart rate', 'cholesterol', 'age', 'rest
                        'fasting blood sugar']
 
 
-
 # Preprocessing and prediction functions for Diabetes
 def preprocess_input_diabetes(*args):
     return args
+
 
 def predict_diabetes(*args):
     preprocessed_data = preprocess_input_diabetes(*args)
     explanation = diabetes_explanation(preprocessed_data)
     return diabetes_classifier.predict([preprocessed_data]), explanation
 
+
 def diabetes_explanation(instance):
     series = pd.Series(instance, index=diabetes_feature_names)
-    exp = diabetes_explainer.explain_instance(data_row=series, predict_fn=diabetes_classifier.predict_proba)
+    exp = diabetes_explainer.explain_instance(data_row=series, predict_fn=diabetes_classifier.predict_proba, top_labels=2)
     return exp
 
 
@@ -98,15 +98,18 @@ def preprocess_input_heart(age, sex, *rest):
     sex_encoded = 1 if sex == 'M' else 0
     return (age, sex_encoded) + rest
 
+
 def predict_heart_disease(age, sex, *rest):
     preprocessed_data = preprocess_input_heart(age, sex, *rest)
     explanation = heart_explanation(preprocessed_data)
     return stacking_classifier_heart.predict([preprocessed_data]), explanation
 
+
 def heart_explanation(instance):
     series = pd.Series(instance, index=heart_feature_names)
-    exp = heart_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_heart.predict_proba)
+    exp = heart_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_heart.predict_proba, top_labels=2)
     return exp
+
 
 # Preprocessing and prediction functions for Lung Cancer
 def preprocess_input_lung(age, *args):
@@ -114,6 +117,7 @@ def preprocess_input_lung(age, *args):
     if all(val is None for val in encoded):
         encoded = [1] * len(args)
     return (age,) + tuple(encoded)
+
 
 def predict_lung_cancer(age, *args):
     preprocessed_data = preprocess_input_lung(age, *args)
@@ -124,8 +128,9 @@ def predict_lung_cancer(age, *args):
 
 def lung_explanation(instance):
     series = pd.Series(instance, index=lung_feature_names)
-    exp = lung_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_lung.predict_proba)
+    exp = lung_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_lung.predict_proba, top_labels=2)
     return exp
+
 
 # predict for anemia
 
@@ -161,14 +166,14 @@ def decode_anemia_prediction(prediction):
 def anemia_explanation(instance):
     series = pd.Series(instance[0], index=anemia_feature_names)
     exp = anemia_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_anemia.predict_proba,
-                                            num_features=6)
+                                            top_labels=5)
     return exp
-
 
 
 # Streamlit app
 def main():
-    st.markdown('<p style="font-size:20px;">⚠️ <strong>Warning:</strong> Please do not use as a doctor advice.</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:20px;">⚠️ <strong>Warning:</strong> Please do not use as a doctor advice.</p>',
+                unsafe_allow_html=True)
     st.title('Medical Prediction Systems')
     tab1, tab2, tab3, tab4 = st.tabs(
         ["Diabetes Prediction", "Heart Disease Prediction", "Lung Cancer Prediction", "Anemia Prediction"])
@@ -188,12 +193,13 @@ def main():
             DiabetesPedigreeFunction = st.number_input('Diabetes Pedigree Function', min_value=0.0)
             Age = st.number_input('Age', min_value=0, step=1)
         if st.button('Predict Diabetes'):
-            result, explanation = predict_diabetes(Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI, DiabetesPedigreeFunction, Age)
+            result, explanation = predict_diabetes(Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI,
+                                                   DiabetesPedigreeFunction, Age)
             st.write('Please visit the endocrinologist' if result[0] == 1 else 'No need to see the endocrinologist')
-            st.pyplot(explanation.as_pyplot_figure())
-            plt.clf()
 
-            explanation.show_in_notebook()
+            st.write('Explanations for prediction:')
+            st.pyplot(explanation.as_pyplot_figure(result[0]))
+            plt.clf()
     with tab2:
         st.header("Should I see a cardiologist?")
         col1, col2, col3 = st.columns(3)
@@ -212,13 +218,14 @@ def main():
             max_heart_rate = st.number_input('Max Heart Rate', min_value=0)
             exercise_angina = st.number_input('Exercise Angina', min_value=0, max_value=1)
         if st.button('Predict Heart Disease'):
-            result, explanation = predict_heart_disease(age, sex, chest_pain_type, resting_bps, cholesterol, fasting_blood_sugar, resting_ecg, max_heart_rate, exercise_angina, oldpeak, ST_slope)
+            result, explanation = predict_heart_disease(age, sex, chest_pain_type, resting_bps, cholesterol,
+                                                        fasting_blood_sugar, resting_ecg, max_heart_rate,
+                                                        exercise_angina, oldpeak, ST_slope)
             st.write('Please visit the cardiologist' if result[0] == 1 else 'No need to see the cardiologist')
 
-            st.pyplot(explanation.as_pyplot_figure())
+            st.write('Explanations for prediction:')
+            st.pyplot(explanation.as_pyplot_figure(result[0]))
             plt.clf()
-
-            explanation.show_in_notebook()
 
     with tab3:
         st.header("Should I see an oncologist?")
@@ -240,13 +247,14 @@ def main():
             shortness_of_breath = st.radio('Shortness of Breath', ['Yes', 'No'], index=1)
             swallowing_difficulty = st.radio('Swallowing Difficulty', ['Yes', 'No'], index=1)
         if st.button('Predict Lung Cancer'):
-            result, explanation = predict_lung_cancer(age, smoking, yellow_fingers, anxiety, peer_pressure, chronic_disease, fatigue, allergy, wheezing, alcohol_consuming, coughing, shortness_of_breath, swallowing_difficulty)
+            result, explanation = predict_lung_cancer(age, smoking, yellow_fingers, anxiety, peer_pressure,
+                                                      chronic_disease, fatigue, allergy, wheezing, alcohol_consuming,
+                                                      coughing, shortness_of_breath, swallowing_difficulty)
             st.write('Please visit the oncologist' if result[0] == 1 else 'No need to see the oncologist')
 
-            st.pyplot(explanation.as_pyplot_figure())
+            st.write('Explanations for prediction:')
+            st.pyplot(explanation.as_pyplot_figure(result[0]))
             plt.clf()
-
-            explanation.show_in_notebook()
     with tab4:
         st.header("Anemia Prediction")
         # features gender, hemoglobin, total serum iron, folate, B12, ferrite
@@ -267,10 +275,12 @@ def main():
 
             st.write(prediction)
 
-            st.pyplot(explanation.as_pyplot_figure())
+            st.write('No need to see a hematologist' if result[0] == 0 else 'Please visit a hematologist')
+
+            st.write('Explanations for prediction:')
+            st.pyplot(explanation.as_pyplot_figure(result[0]))
             plt.clf()
 
-            explanation.show_in_notebook()
 
 if __name__ == "__main__":
     main()
