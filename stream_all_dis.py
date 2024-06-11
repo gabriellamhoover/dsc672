@@ -1,31 +1,15 @@
-import numpy as np
 import streamlit as st
 import joblib
 import pandas as pd
 from lime.lime_tabular import LimeTabularExplainer
 from matplotlib import pyplot as plt
-import streamlit.components.v1 as components
 
 # Load trained models
 diabetes_classifier = joblib.load('stacked_diabetes_model.pkl')
 stacking_classifier_heart = joblib.load('stacked_heart_model.pkl')
 stacking_classifier_lung = joblib.load('stacking_cancer_model.pkl')
-stacking_classifier_anemia = joblib.load('anemia_stacked_model.pkl')
 
-# make anemia explainer
-X_train_anemia = pd.read_pickle('X_train_anemia.pkl')
-y_train_anemia = pd.read_pickle('y_train_anemia.pkl')
-anemia_class_names = ["No Anemia", "HGB Anemia", "Iron Anemia", "Folate Anemia", "B12 Anemia"]
-anemia_explainer = LimeTabularExplainer(
-    training_data=X_train_anemia.values,
-    training_labels=y_train_anemia.values,
-    feature_names=X_train_anemia.columns,
-    class_names=anemia_class_names,
-    mode='classification',
-    random_state=42
-)
 
-anemia_feature_names = ['HGB', 'TSD', 'FOLATE', 'B12', 'GENDER', 'FERRITE']
 
 # make diabetes explainer
 X_train_diabetes = pd.read_pickle('X_train_diabetes.pkl')
@@ -132,51 +116,13 @@ def lung_explanation(instance):
     return exp
 
 
-# predict for anemia
-
-def preprocess_input_anemia(gender, *args):
-    gender_encoded = 1 if gender == 'M' else 0
-    preprocessed_data = []
-    for x in args:
-        preprocessed_data.append(x)
-    preprocessed_data.insert(4, gender_encoded)
-    return preprocessed_data
-
-
-def predict_anemia(gender, *args):
-    preprocessed_data = preprocess_input_anemia(gender, *args)
-    preprocessed_data = np.array(preprocessed_data).reshape(1, -1)
-    explanation = anemia_explanation(preprocessed_data)
-    return stacking_classifier_anemia.predict(preprocessed_data), explanation
-
-
-def decode_anemia_prediction(prediction):
-    if prediction == 0:
-        return "No Anemia"
-    if prediction == 1:
-        return "HGB Anemia"
-    if prediction == 2:
-        return "Iron Anemia"
-    if prediction == 3:
-        return "Folate Anemia"
-    if prediction == 4:
-        return "B12 Anemia"
-
-
-def anemia_explanation(instance):
-    series = pd.Series(instance[0], index=anemia_feature_names)
-    exp = anemia_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_anemia.predict_proba,
-                                            top_labels=5)
-    return exp
-
-
 # Streamlit app
 def main():
     st.markdown('<p style="font-size:20px;">⚠️ <strong>Warning:</strong> Please do not use as a doctor advice.</p>',
                 unsafe_allow_html=True)
     st.title('Medical Prediction Systems')
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["Diabetes Prediction", "Heart Disease Prediction", "Lung Cancer Prediction", "Anemia Prediction"])
+    tab1, tab2, tab3= st.tabs(
+        ["Diabetes Prediction", "Heart Disease Prediction", "Lung Cancer Prediction"])
 
     with tab1:
         st.header("Should I see an endocrinologist?")
@@ -255,32 +201,6 @@ def main():
             st.write('Explanations for prediction:')
             st.pyplot(explanation.as_pyplot_figure(result[0]))
             plt.clf()
-    with tab4:
-        st.header("Should I see a hematologist?")
-        # features gender, hemoglobin, total serum iron, folate, B12, ferrite
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            hemoglobin = st.number_input('Hemoglobin', min_value=0.00)
-            # 1 is male
-            gender = st.selectbox('Gender', ['M', 'F'])
-        with col2:
-            tsd = st.number_input('Total Serum Iron', min_value=0)
-            folate = st.number_input('Folate', min_value=0)
-        with col3:
-            b12 = st.number_input('B12', min_value=0)
-            ferrite = st.number_input('Ferrite', min_value=0)
-        if st.button('Predict Anemia Disease'):
-            result, explanation = predict_anemia(gender, hemoglobin, tsd, folate, b12, ferrite)
-            prediction = decode_anemia_prediction(result[0])
-
-            st.write(prediction)
-
-            st.write('No need to see a hematologist' if result[0] == 0 else 'Please visit a hematologist')
-
-            st.write('Explanations for prediction:')
-            st.pyplot(explanation.as_pyplot_figure(result[0]))
-            plt.clf()
-
 
 if __name__ == "__main__":
     main()
