@@ -5,9 +5,9 @@ from lime.lime_tabular import LimeTabularExplainer
 from matplotlib import pyplot as plt
 
 # Load trained models
-diabetes_classifier = joblib.load('stacked_diabetes_model.pkl')
-stacking_classifier_heart = joblib.load('stacked_heart_model.pkl')
-stacking_classifier_lung = joblib.load('stacking_cancer_model.pkl')
+diabetes_classifier = joblib.load('best_model_diabetes.pkl')
+heart_classifier = joblib.load('best_model_heart.pkl')
+lung_classifier = joblib.load('best_lung_model.pkl')
 
 
 
@@ -79,19 +79,21 @@ def diabetes_explanation(instance):
 
 # Preprocessing and prediction functions for Heart Disease
 def preprocess_input_heart(age, sex, *rest):
+
     sex_encoded = 1 if sex == 'M' else 0
     return (age, sex_encoded) + rest
+
 
 
 def predict_heart_disease(age, sex, *rest):
     preprocessed_data = preprocess_input_heart(age, sex, *rest)
     explanation = heart_explanation(preprocessed_data)
-    return stacking_classifier_heart.predict([preprocessed_data]), explanation
+    return heart_classifier.predict([preprocessed_data]), explanation
 
 
 def heart_explanation(instance):
     series = pd.Series(instance, index=heart_feature_names)
-    exp = heart_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_heart.predict_proba, top_labels=2)
+    exp = heart_explainer.explain_instance(data_row=series, predict_fn=heart_classifier.predict_proba, top_labels=2)
     return exp
 
 
@@ -107,12 +109,12 @@ def predict_lung_cancer(age, *args):
     preprocessed_data = preprocess_input_lung(age, *args)
     # have to rerun code to make classifier with svc(probability=True)
     explanation = lung_explanation(preprocessed_data)
-    return stacking_classifier_lung.predict([preprocessed_data]), explanation
+    return lung_classifier.predict([preprocessed_data]), explanation
 
 
 def lung_explanation(instance):
     series = pd.Series(instance, index=lung_feature_names)
-    exp = lung_explainer.explain_instance(data_row=series, predict_fn=stacking_classifier_lung.predict_proba, top_labels=2)
+    exp = lung_explainer.explain_instance(data_row=series, predict_fn=lung_classifier.predict_proba, top_labels=2)
     return exp
 
 
